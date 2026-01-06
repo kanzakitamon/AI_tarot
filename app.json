@@ -1,0 +1,40 @@
+﻿{
+  "expo": {
+    "name": "タロット占い",
+    "slug": "tarot-reading-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tarotreading.app"
+    },
+    "android": {
+      "package": "com.tarotreading.app"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "./app"
+        }
+      ],
+      [
+        "expo-sqlite",
+        {
+          "enableForExpoGo": true
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "iosAppId": "ca-app-pub-4764153276310493~2755952356"
+        }
+      ]
+    ],
+    "scheme": "tarot-reading"
+  }
+}
