@@ -1,0 +1,21 @@
+# EAS Build にアップロードしないもの（ビルド成果物・キャッシュ）
+# ※ android/ のソース（manifest, mipmap, build.gradle 等）は残す
+node_modules/
+.expo/
+.expo-shared/
+web-build/
+dist/
+.git/
+
+# ネイティブのビルド成果物・キャッシュ（EASはクリーンビルドするため不要）
+android/build/
+android/app/build/
+android/.gradle/
+android/.cxx/
+android/app/.cxx/
+ios/build/
+ios/Pods/
+
+# その他
+**/*.log
+.vscode/
