@@ -5,11 +5,30 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SERVER_ENDPOINT": "REPLACE_WITH_DEV_SERVER_URL/api/generate-reading"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SERVER_ENDPOINT": "https://tarot-reading-server.onrender.com/api/generate-reading",
+        "EXPO_PUBLIC_APP_TOKEN": "445370e6af4646373d4596348db9d5dc83cf8622de17ec08"
+      }
     },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SERVER_ENDPOINT": "https://tarot-reading-server.onrender.com/api/generate-reading",
+        "EXPO_PUBLIC_APP_TOKEN": "445370e6af4646373d4596348db9d5dc83cf8622de17ec08"
+      }
+    }
+  },
+  "submit": {
     "production": {}
   }
 }

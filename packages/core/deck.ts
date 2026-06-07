@@ -115,6 +115,23 @@ export function shuffleDeck(seed?: number): number[] {
   return deck;
 }
 
+/**
+ * 日付ごとに固定の「今日の1枚」を決める。
+ * 同じ日付なら必ず同じカードを返す（AI生成なし・コスト0）。
+ */
+export function getDailyCardId(date: Date = new Date()): number {
+  const seed = date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+  return seed % CARD_DESCRIPTIONS.length;
+}
+
+/**
+ * 「今日の1枚」が正位置か逆位置かを日付シードで決める。
+ */
+export function getDailyCardReversed(date: Date = new Date()): boolean {
+  const seed = date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+  return seed % 2 === 1;
+}
+
 export function normalizeQuestion(inputText: string): string {
   const normalized = inputText.trim().replace(/\s+/g, ' ');
   if (normalized.length === 0) {
@@ -198,7 +215,7 @@ export function buildPrompt(questionNormalized: string, picks: CardPick[]): stri
     cardDescriptions,
     '',
     '生成ルール',
-    '相談文から相談ジャンルを推定し、語彙と行動をジャンルに合わせる。ジャンルが確信できない場合は中立語彙でまとめ、確認ポイントを1文だけ入れて補強する。助言の行動は候補から1つ選び、相談内容に合わせて具体化し、期限と数量を必ず入れる。reversalModeがreleasedの場合は逆位置でも改善や解除のトーンを優先する。結論では「カードが示す通り」「カードが告げるように」は使わず、カード名は1回までか省略する。本文に「核:」「具体像:」「注意点:」のラベルは出さない。',
+    '相談文から相談ジャンルを推定し、語彙と行動をジャンルに合わせる。ジャンルが確信できない場合は中立語彙でまとめ、確認ポイントを1文だけ入れて補強する。助言の行動は、相談文に書かれた具体的な事情を1つ拾い、その状況にだけ当てはまる形に作り変える。候補は参考程度にとどめ、「○日以内に」「まず小さく」などの定型句は使わない。reversalModeがreleasedの場合は逆位置でも改善や解除のトーンを優先する。結論では「カードが示す通り」「カードが告げるように」は使わず、カード名は1回までか省略する。本文に「核:」「具体像:」「注意点:」のラベルは出さない。',
     '本文の先頭は必ず主語か動詞で始め、「としては」「には」「となっている」「として、」など助詞から始めない。',
   ].join('\n');
 }

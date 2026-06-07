@@ -1,9 +1,8 @@
 ﻿import { buildPrompt } from '../../packages/core/deck';
 import type { CardPick } from '../../packages/core/types';
 
-const SERVER_ENDPOINT =
-  process.env.EXPO_PUBLIC_SERVER_ENDPOINT ||
-  'http://192.168.151.149:3000/api/generate-reading';
+const SERVER_ENDPOINT = process.env.EXPO_PUBLIC_SERVER_ENDPOINT ?? '';
+const APP_TOKEN = process.env.EXPO_PUBLIC_APP_TOKEN ?? '';
 
 interface GenerateReadingRequest {
   questionNormalized: string;
@@ -21,6 +20,14 @@ export async function generateReading(
   questionNormalized: string,
   picks: CardPick[],
 ): Promise<string> {
+  if (!SERVER_ENDPOINT) {
+    throw new Error(
+      'サーバーが設定されていません。\n' +
+        'EXPO_PUBLIC_SERVER_ENDPOINT 環境変数を設定してください。\n' +
+        '（開発時は .env に EXPO_PUBLIC_SERVER_ENDPOINT=http://<LAN-IP>:3000/api/generate-reading を記述）',
+    );
+  }
+
   const prompt = buildPrompt(questionNormalized, picks);
   const healthEndpoint = SERVER_ENDPOINT.replace(
     '/api/generate-reading',
@@ -70,6 +77,7 @@ export async function generateReading(
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache',
+        ...(APP_TOKEN ? { 'x-app-token': APP_TOKEN } : {}),
       },
       body: JSON.stringify({
         questionNormalized,

@@ -102,13 +102,14 @@ export default function MysticButton({
             styles.gradient,
             buttonStyle,
             buttonShadow,
+            styles.primaryBorder,
           ]}
         >
           <Text
             style={[
               styles.text,
               styles.primaryText,
-              { fontSize: typography.button.fontSize },
+              { fontSize: typography.button.fontSize, letterSpacing: 1 },
               textStyle,
             ]}
           >
@@ -130,8 +131,9 @@ export default function MysticButton({
               ? colors.disabledBg
               : isGhost
               ? 'transparent'
-              : colors.primary, // Secondaryも単色に
-            borderWidth: 0, // 囲み枠を削除
+              : 'rgba(255,255,255,0.06)', // Secondaryはガラス調
+            borderWidth: disabled || isGhost ? 0 : 1,
+            borderColor: colors.borderLight, // 薄い金の縁取り
           },
         ]}
       >
@@ -139,12 +141,9 @@ export default function MysticButton({
           style={[
             styles.text,
             {
-              color: disabled
-                ? colors.disabled
-                : isGhost
-                ? colors.textPrimaryDark
-                : colors.textOnPrimary,
+              color: disabled ? colors.disabled : colors.textPrimaryDark,
               fontSize: typography.button.fontSize,
+              letterSpacing: 1,
             },
             textStyle,
           ]}
@@ -186,6 +185,10 @@ const styles = StyleSheet.create({
   gradient: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  primaryBorder: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
   buttonBase: {
     alignItems: 'center',

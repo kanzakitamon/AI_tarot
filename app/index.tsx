@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { getDatabase, getRemainingFreeCount } from '../src/db';
 import AppHeader from '../src/components/AppHeader';
 import OccultBackground from '../src/components/OccultBackground';
 import MysticButton from '../src/components/MysticButton';
@@ -10,19 +9,6 @@ import { colors, typography, spacing } from '../src/theme/tokens';
 
 export default function Index() {
   const router = useRouter();
-  const [remainingCount, setRemainingCount] = useState<number>(3);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const db = await getDatabase();
-        const count = await getRemainingFreeCount(db);
-        setRemainingCount(count);
-      } catch (error) {
-        console.error('Load remaining count error:', error);
-      }
-    })();
-  }, []);
 
   return (
     <OccultBackground>
@@ -33,15 +19,19 @@ export default function Index() {
           <Text style={styles.description}>
             いま気になっていることをそのまま文字にしてください。カードがあなたの感情を映し出します。
           </Text>
-          <Text style={styles.remainingText}>
-            今日の残り回数: {remainingCount}回
-          </Text>
 
           <View style={styles.buttonContainer}>
             <MysticButton
               title="鑑定をはじめる"
               onPress={() => router.push('/read')}
               variant="primary"
+              size="large"
+            />
+            <View style={styles.buttonSpacer} />
+            <MysticButton
+              title="今日の1枚を見る"
+              onPress={() => router.push('/daily')}
+              variant="secondary"
               size="large"
             />
             <View style={styles.buttonSpacer} />
@@ -78,11 +68,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondaryDark,
     textAlign: 'center',
     lineHeight: 24,
-  },
-  remainingText: {
-    ...typography.bodySmall,
-    color: colors.textSecondaryDark,
-    textAlign: 'center',
   },
   buttonContainer: {
     width: '100%',

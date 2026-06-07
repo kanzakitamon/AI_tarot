@@ -9,7 +9,14 @@ import {
 } from '../../packages/core/deck';
 import type { CardRole, CardPick, PickedCard } from '../../packages/core/types';
 import { generateReading } from '../services/aiService';
-import { getDatabase, saveReadingResult } from '../db';
+import {
+  getDatabase,
+  saveReadingResult,
+  incrementFreeUsage,
+  incrementRewardUsage,
+} from '../db';
+
+export type UsageType = 'free' | 'reward';
 
 export type ReadingState =
   | 'input'
@@ -204,7 +211,7 @@ export function useReadingFlow() {
     });
   }, [flowState.arrangedPicks, flowState.reversedStates]);
 
-  const startGenerating = useCallback(async () => {
+  const startGenerating = useCallback(async (usageType: UsageType) => {
     setFlowState(prev => ({
       ...prev,
       state: 'generating',
@@ -232,6 +239,11 @@ export function useReadingFlow() {
           picks: historyEntry,
           finalText: result,
         });
+        if (usageType === 'free') {
+          await incrementFreeUsage(db);
+        } else {
+          await incrementRewardUsage(db);
+        }
       } catch (dbError) {
         console.error('Failed to save reading history', dbError);
       }

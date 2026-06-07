@@ -1,8 +1,8 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { DailyUsage } from '../../packages/core/types';
 
-const FREE_LIMIT = 3;
-const REWARD_LIMIT = 10; // 1日の上限（無料3回 + リワード7回）
+const FREE_LIMIT = 1;
+const REWARD_LIMIT = 10; // 1日の上限（無料1回 + リワード9回）
 
 export function getTodayKey(): string {
   const now = new Date();

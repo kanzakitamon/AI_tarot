@@ -12,13 +12,18 @@ import {
   ScrollView,
   LayoutChangeEvent,
   Share,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 import { useReadingFlow } from '../src/hooks/useReadingFlow';
+import ShareableReadingCard from '../src/components/ShareableReadingCard';
+import { useRewardedAd } from '../src/hooks/useRewardedAd';
+import { useDailyUsage } from '../src/hooks/useDailyUsage';
+import { useCardFlipAnimation } from '../src/hooks/useCardFlipAnimation';
 import { CARDS } from '../packages/core/deck';
 import { MAJOR_ARCANA_MEANINGS } from '../packages/core/majorArcanaMeanings';
 import OccultBackground from '../src/components/OccultBackground';
@@ -26,19 +31,12 @@ import AppHeader from '../src/components/AppHeader';
 import MysticButton from '../src/components/MysticButton';
 import { colors, typography, spacing, radius } from '../src/theme/tokens';
 import { playSoundEffect } from '../src/services/soundEffect';
-import mobileAds, {
-  RewardedAd,
-  RewardedAdEventType,
-  AdEventType,
-  TestIds,
-} from 'react-native-google-mobile-ads';
 
 const screenWidth = Dimensions.get('window').width;
 const CARD_WIDTH = Math.round(screenWidth * 0.72);
 const CARD_HEIGHT = Math.round(CARD_WIDTH * 1.6);
 const GAP = 20;
 const ITEM_WIDTH = CARD_WIDTH + GAP;
-const FLIP_PHASE_DURATION = 650;
 const REVIEW_ROW_HORIZONTAL_PADDING = spacing.lg;
 const REVIEW_ROW_GAP = spacing.md;
 const reviewAvailableWidth = Math.max(
@@ -50,6 +48,8 @@ const REVIEW_CARD_WIDTH = Math.min(
   Math.max(1, Math.floor(reviewAvailableWidth / 3)),
 );
 const CARD_INFO_MIN_HEIGHT = 110;
+// カード画像の実寸比率（300x527）。これに合わせて表示し、cover による切り取りを防ぐ
+const CARD_ASPECT = 300 / 527;
 
 const roleNames: Record<string, string> = {
   situation: '状況',
@@ -76,34 +76,34 @@ export default function ReadScreen() {
     getCardPicks,
   } = useReadingFlow();
 
-  const [inputText, setInputText] = useState('今の仕事を辞めて転職するべきか？');
+  const [inputText, setInputText] = useState('');
   const [listWidth, setListWidth] = useState(0);
   const [listContentWidth, setListContentWidth] = useState(0);
   const [didInitialScroll, setDidInitialScroll] = useState(false);
   const [isConsultationOpen, setIsConsultationOpen] = useState(false);
-  const flatListRef = useRef<FlatList<{ id: number }>>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const [isFlippingSequence, setIsFlippingSequence] = useState(false);
   const [isRewarding, setIsRewarding] = useState(false);
-  const rewardedAdRef = useRef<RewardedAd | null>(null);
-  const [isRewardedLoaded, setIsRewardedLoaded] = useState(false);
-  const flipAnimations = useRef([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current;
-  const [showFrontStates, setShowFrontStates] = useState([false, false, false]);
+  const flatListRef = useRef<FlatList<{ id: number }>>(null);
+  const shareCardRef = useRef<View>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  const { remainingFree, remainingReward, refresh: refreshUsage } = useDailyUsage();
+  const { showRewardedAd } = useRewardedAd({ onLoadError: setErrorMessage });
+  const {
+    flipAnimations,
+    showFrontStates,
+    isFlippingSequence,
+    setIsFlippingSequence,
+    flipAllSequentially,
+  } = useCardFlipAnimation({
+    resetTrigger: flowState.state,
+    onFlipComplete: flipCard,
+  });
+
   const didInitScrollRef = useRef(false);
   const listSidePadding = useMemo(
     () => Math.max(Math.round((listWidth - ITEM_WIDTH) / 2), 0),
     [listWidth],
   );
-  const rewardedAdUnitId = useMemo(() => {
-    if (Platform.OS === 'ios') {
-      return __DEV__ ? TestIds.REWARDED : 'ca-app-pub-4764153276310493/3366326448';
-    }
-    return TestIds.REWARDED;
-  }, []);
   const isListReady = listWidth > 0 && listContentWidth > 0;
   const resultSections = useMemo(() => {
     const raw = flowState.finalResult?.trim();
@@ -189,64 +189,32 @@ export default function ReadScreen() {
     [flowState.pickedCardIds.join(',')],
   );
   useEffect(() => {
-    if (flowState.state === 'flipping') {
-      flipAnimations.forEach(anim => anim.setValue(0));
-      setShowFrontStates([false, false, false]);
-      setIsFlippingSequence(false);
+    if (flowState.state !== 'picking') {
+      return;
     }
-  }, [flowState.state, flipAnimations]);
-  useEffect(() => {
-    mobileAds().initialize().catch(() => {});
-  }, []);
-  useEffect(() => {
-    const ad = RewardedAd.createForAdRequest(rewardedAdUnitId, {
-      requestNonPersonalizedAdsOnly: true,
+    if (!flatListRef.current || cardData.length === 0 || !isListReady) {
+      return;
+    }
+    if (didInitScrollRef.current) {
+      return;
+    }
+    didInitScrollRef.current = true;
+    const offset = initialOffset;
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({ offset, animated: false });
+      scrollX.setValue(offset);
+      setDidInitialScroll(true);
     });
-    rewardedAdRef.current = ad;
-    const unsubscribeLoaded = ad.addAdEventListener(AdEventType.LOADED, () => {
-      setIsRewardedLoaded(true);
-    });
-    const unsubscribeClosed = ad.addAdEventListener(AdEventType.CLOSED, () => {
-      setIsRewardedLoaded(false);
-    });
-    const unsubscribeError = ad.addAdEventListener(AdEventType.ERROR, error => {
-      setIsRewardedLoaded(false);
-      setErrorMessage(`広告の読み込みに失敗しました：${error.message ?? '不明なエラー'}`);
-    });
-    ad.load();
-    return () => {
-      unsubscribeLoaded();
-      unsubscribeClosed();
-      unsubscribeError();
-    };
-  }, [rewardedAdUnitId, setErrorMessage]);
+  }, [flowState.state, cardData.length, isListReady, initialOffset, scrollX]);
 
   useEffect(() => {
     if (flowState.state === 'picking') {
-      if (
-        flatListRef.current &&
-        cardData.length > 0 &&
-        isListReady &&
-        !didInitScrollRef.current
-      ) {
-        didInitScrollRef.current = true;
-        const offset = initialOffset;
-        requestAnimationFrame(() => {
-          flatListRef.current?.scrollToOffset({ offset, animated: false });
-          scrollX.setValue(offset);
-          setDidInitialScroll(true);
-        });
-      }
-    } else {
-      didInitScrollRef.current = false;
-      if (listContentWidth !== 0) {
-        setListContentWidth(0);
-      }
-      if (didInitialScroll) {
-        setDidInitialScroll(false);
-      }
+      return;
     }
-  }, [flowState.state, cardData.length, isListReady, scrollX, listContentWidth, didInitialScroll]);
+    didInitScrollRef.current = false;
+    setListContentWidth(0);
+    setDidInitialScroll(false);
+  }, [flowState.state]);
 
   useEffect(() => {
     if (flowState.state !== 'flipping' && isFlippingSequence) {
@@ -341,131 +309,66 @@ export default function ReadScreen() {
     [listContentWidth],
   );
 
-  const handleFlipPress = useCallback(
-    (index: number, onComplete?: () => void) => {
-      if (flowState.flippedCards[index]) {
-        onComplete?.();
-        return;
-      }
-
-      const anim = flipAnimations[index];
-      const firstHalf = Animated.timing(anim, {
-        toValue: 0.5,
-        duration: FLIP_PHASE_DURATION,
-        useNativeDriver: true,
-      });
-      const secondHalf = Animated.timing(anim, {
-        toValue: 1,
-        duration: FLIP_PHASE_DURATION,
-        useNativeDriver: true,
-      });
-
-      playSoundEffect('cardFlip').catch(() => {});
-      firstHalf.start(() => {
-        setShowFrontStates(prev => {
-          const next = [...prev];
-          next[index] = true;
-          return next;
-        });
-        secondHalf.start(() => {
-          flipCard(index);
-          onComplete?.();
-        });
-      });
-    },
-    [flipAnimations, flipCard, flowState.flippedCards],
-  );
-
-  const flipAllSequentially = useCallback(() => {
-    return new Promise<void>(resolve => {
-      const flipSequentially = (i: number) => {
-        if (i >= 3) {
-          resolve();
-          return;
-        }
-        handleFlipPress(i, () => flipSequentially(i + 1));
-      };
-      flipSequentially(0);
-    });
-  }, [handleFlipPress]);
-
-  const areAllFlipped = flowState.flippedCards.length === 3 && flowState.flippedCards.every(Boolean);
-  const showRewardedAd = useCallback((): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
-      const ad = rewardedAdRef.current;
-      if (!ad) {
-        reject(new Error('広告の初期化に失敗しました。'));
-        return;
-      }
-      let earned = false;
-      const unsubscribeReward = ad.addAdEventListener(
-        RewardedAdEventType.EARNED_REWARD,
-        () => {
-          earned = true;
-        },
-      );
-      const unsubscribeClosed = ad.addAdEventListener(AdEventType.CLOSED, () => {
-        unsubscribeReward();
-        unsubscribeClosed();
-        unsubscribeError();
-        resolve(earned);
-      });
-      const unsubscribeError = ad.addAdEventListener(AdEventType.ERROR, error => {
-        unsubscribeReward();
-        unsubscribeClosed();
-        unsubscribeError();
-        reject(error);
-      });
-
-      if (isRewardedLoaded) {
-        ad.show();
-        return;
-      }
-
-      const loadTimeout = setTimeout(() => {
-        unsubscribeReward();
-        unsubscribeClosed();
-        unsubscribeError();
-        reject(new Error('広告の読み込みがタイムアウトしました。'));
-      }, 15000);
-      const unsubscribeLoaded = ad.addAdEventListener(AdEventType.LOADED, () => {
-        clearTimeout(loadTimeout);
-        unsubscribeLoaded();
-        ad.show();
-      });
-      ad.load();
-    });
-  }, [isRewardedLoaded]);
+  const areAllFlipped =
+    flowState.flippedCards.length === 3 && flowState.flippedCards.every(Boolean);
 
   const handleFlipButtonPress = useCallback(() => {
     if (areAllFlipped) {
       if (isRewarding) {
         return;
       }
-      setIsRewarding(true);
-      setErrorMessage(undefined);
-      showRewardedAd()
-        .then(earned => {
-          if (!earned) {
-            setErrorMessage('広告の視聴が完了しませんでした。もう一度お試しください。');
-            return;
-          }
-          startGenerating();
-        })
-        .catch(error => {
-          const message = error?.message || String(error ?? '不明なエラー');
-          setErrorMessage(`広告の再生に失敗しました：${message}`);
-        })
-        .finally(() => {
-          setIsRewarding(false);
+
+      if (remainingFree > 0) {
+        setErrorMessage(undefined);
+        startGenerating('free').finally(() => {
+          refreshUsage();
         });
+        return;
+      }
+
+      if (remainingReward > 0) {
+        setIsRewarding(true);
+        setErrorMessage(undefined);
+        showRewardedAd()
+          .then(earned => {
+            if (!earned) {
+              setErrorMessage('広告の視聴が完了しませんでした。もう一度お試しください。');
+              return;
+            }
+            return startGenerating('reward').finally(() => {
+              refreshUsage();
+            });
+          })
+          .catch(error => {
+            const message = error?.message || String(error ?? '不明なエラー');
+            setErrorMessage(`広告の再生に失敗しました：${message}`);
+          })
+          .finally(() => {
+            setIsRewarding(false);
+          });
+        return;
+      }
+
+      setErrorMessage('今日の鑑定上限に達しました。明日また試してください。');
       return;
     }
     setIsFlippingSequence(true);
-    flipAllSequentially().finally(() => {
+    flipAllSequentially(flowState.flippedCards).finally(() => {
       setIsFlippingSequence(false);
     });
-  }, [areAllFlipped, startGenerating, flipAllSequentially, isRewarding, setErrorMessage, showRewardedAd]);
+  }, [
+    areAllFlipped,
+    startGenerating,
+    flipAllSequentially,
+    flowState.flippedCards,
+    isRewarding,
+    setErrorMessage,
+    setIsFlippingSequence,
+    showRewardedAd,
+    remainingFree,
+    remainingReward,
+    refreshUsage,
+  ]);
 
   if (flowState.state === 'input') {
     return (
@@ -528,6 +431,7 @@ export default function ReadScreen() {
               <Animated.FlatList
                 ref={flatListRef}
                 data={cardData}
+                extraData={flowState.pickedCardIds.length}
                 horizontal
                 keyExtractor={item => item.id.toString()}
                 renderItem={renderCard}
@@ -574,7 +478,15 @@ export default function ReadScreen() {
   }
   
   if (flowState.state === 'flipping') {
-    const buttonTitle = areAllFlipped ? '鑑定結果へ' : 'カードをめくる';
+    const isOutOfQuota =
+      areAllFlipped && remainingFree <= 0 && remainingReward <= 0;
+    const buttonTitle = !areAllFlipped
+      ? 'カードをめくる'
+      : remainingFree > 0
+      ? '鑑定結果へ'
+      : remainingReward > 0
+      ? '広告を見て鑑定する（+1回）'
+      : '今日の上限に達しました';
 
     return (
       <OccultBackground>
@@ -676,7 +588,7 @@ export default function ReadScreen() {
               <MysticButton
                 title={buttonTitle}
                 onPress={handleFlipButtonPress}
-                disabled={isFlippingSequence || isRewarding}
+                disabled={isFlippingSequence || isRewarding || isOutOfQuota}
                 variant="primary"
                 size="large"
               />
@@ -712,6 +624,37 @@ export default function ReadScreen() {
             .filter(Boolean)
             .join('\n')
         : flowState.finalResult || '鑑定結果';
+    const shareConclusion =
+      resultSections.find(section => section.title === '結論')?.lines.join('\n') ||
+      resultSections[0]?.lines.join('\n') ||
+      flowState.finalResult ||
+      '';
+    const handleShare = async () => {
+      try {
+        if (shareCardRef.current) {
+          const uri = await captureRef(shareCardRef, {
+            format: 'png',
+            quality: 1,
+            result: 'tmpfile',
+          });
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType: 'image/png',
+              dialogTitle: '鑑定結果をシェア',
+            });
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to share reading image', error);
+      }
+      // フォールバック: テキスト共有
+      try {
+        await Share.share({ message: shareText });
+      } catch (error) {
+        console.error('Failed to share reading result', error);
+      }
+    };
     return (
       <OccultBackground>
         <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -787,14 +730,9 @@ export default function ReadScreen() {
                       style={styles.resultSection}
                     >
                       <Text style={styles.resultSectionTitle}>{section.title}</Text>
-                      {section.lines.map((line, idx) => (
-                        <Text
-                          key={`${section.title}-${sectionIndex}-${idx}`}
-                          style={styles.resultSectionBody}
-                        >
-                          {line}
-                        </Text>
-                      ))}
+                      <Text style={styles.resultSectionBody}>
+                        {section.lines.join('')}
+                      </Text>
                     </View>
                   ))}
                 </View>
@@ -804,14 +742,8 @@ export default function ReadScreen() {
                 </Text>
               )}
               <MysticButton
-                title="共有する"
-                onPress={async () => {
-                  try {
-                    await Share.share({ message: shareText });
-                  } catch (error) {
-                    console.error('Failed to share reading result', error);
-                  }
-                }}
+                title="画像でシェアする"
+                onPress={handleShare}
                 variant="primary"
                 size="large"
               />
@@ -826,6 +758,13 @@ export default function ReadScreen() {
               />
             </View>
           </ScrollView>
+          <View style={styles.offscreen} pointerEvents="none">
+            <ShareableReadingCard
+              ref={shareCardRef}
+              picks={picks}
+              conclusion={shareConclusion}
+            />
+          </View>
         </SafeAreaView>
       </OccultBackground>
     );
@@ -998,21 +937,23 @@ const styles = StyleSheet.create({
   },
   arrangedImage: {
     width: '100%',
-    aspectRatio: 2 / 3,
-    borderRadius: 12,
+    aspectRatio: CARD_ASPECT,
+    borderRadius: 10,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   reversedImage: {
     transform: [{ rotate: '180deg' }],
   },
   flipCardFrame: {
     width: '100%',
-    aspectRatio: 2 / 3,
-    perspective: 1000,
+    aspectRatio: CARD_ASPECT,
+    transform: [{ perspective: 1000 }],
   },
   flipCardFrameResult: {
     width: '100%',
-    aspectRatio: 2 / 3,
+    aspectRatio: CARD_ASPECT,
     justifyContent: 'center',
   },
   flipSide: {
@@ -1105,5 +1046,10 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondaryDark,
     lineHeight: 22,
+  },
+  offscreen: {
+    position: 'absolute',
+    left: -9999,
+    top: 0,
   },
 });

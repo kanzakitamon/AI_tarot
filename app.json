@@ -1,10 +1,11 @@
-﻿{
+{
   "expo": {
-    "name": "タロット占い",
+    "name": "タロット占い - 悩みを文章で鑑定",
     "slug": "tarot-reading-app",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -13,7 +14,21 @@
       "bundleIdentifier": "com.tarotreading.app"
     },
     "android": {
-      "package": "com.tarotreading.app"
+      "package": "com.tarotreading.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.VIBRATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "plugins": [
       [
@@ -31,10 +46,26 @@
       [
         "react-native-google-mobile-ads",
         {
-          "iosAppId": "ca-app-pub-4764153276310493~2755952356"
+          "iosAppId": "ca-app-pub-4764153276310493~2755952356",
+          "androidAppId": "ca-app-pub-4764153276310493~5276806931"
+        }
+      ],
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "color": "#5C6CFF"
         }
       ]
     ],
-    "scheme": "tarot-reading"
+    "scheme": "tarot-reading",
+    "extra": {
+      "router": {
+        "root": "./app"
+      },
+      "eas": {
+        "projectId": "b5cc19a7-13b3-4f2c-965d-5965973209a2"
+      }
+    }
   }
 }

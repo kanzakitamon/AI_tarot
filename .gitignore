@@ -7,6 +7,7 @@ npm-debug.*
 .cursor/
 .vscode/
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
@@ -24,4 +25,5 @@ web-build/
 # Server
 server/node_modules/
 server/.env
+android/app/debug.keystore
 

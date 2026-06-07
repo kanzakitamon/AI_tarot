@@ -40,6 +40,7 @@ export const radius = {
   card: 18,
   input: 12,
   small: 8,
+  lg: 16,
 } as const;
 
 export const spacing = {
@@ -53,6 +54,11 @@ export const spacing = {
 
 export const typography = {
   title: {
+    fontSize: 28,
+    fontWeight: 'bold' as const,
+    lineHeight: 36,
+  },
+  titleLarge: {
     fontSize: 28,
     fontWeight: 'bold' as const,
     lineHeight: 36,

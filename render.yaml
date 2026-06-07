@@ -1,0 +1,19 @@
+# Render Blueprint — タロット鑑定APIサーバー
+# Render の Dashboard → New → Blueprint でこのリポジトリを選ぶと、
+# 下記設定でサービスが自動作成される。
+# OPENAI_API_KEY と APP_SHARED_TOKEN は sync:false なので、作成時にダッシュボードで値を入力する。
+services:
+  - type: web
+    name: tarot-reading-server
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: APP_SHARED_TOKEN
+        sync: false
